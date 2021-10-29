@@ -5,6 +5,7 @@ ADD https://github.com/mlocati/docker-php-extension-installer/releases/latest/do
 ENV GAME_SERVER http://volga-it-2021.ml
 ENV GAME_ID 617c01b4e9df051bb57d2ef4
 ENV PLAYER_ID 1
+ENV NEW_GAME false
 
 RUN apk --no-cache update && apk --no-cache add bash git
 
@@ -19,4 +20,4 @@ RUN chmod +x /usr/local/bin/install-php-extensions && sync && \
 
 RUN wget https://get.symfony.com/cli/installer -O - | bash && mv /root/.symfony/bin/symfony /usr/local/bin/symfony
 
-CMD [ "php", "bin/console", "play", "--gameServer=${GAME_SERVER}", "--gameId=${GAME_ID}",  "--playerId=${PLAYER_ID}" ]
+CMD [ "sh", "-c", "if [[ \"$NEW_GAME\" == \"true\" ]]; then php bin/console play --gameServer=$GAME_SERVER --newGame; else php bin/console play --gameServer=$GAME_SERVER --gameId=$GAME_ID --playerId=$PLAYER_ID; fi" ]

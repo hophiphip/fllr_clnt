@@ -19,6 +19,11 @@ php bin/console regenerate-app-secret
 `https://fllr.herokuapp.com` url will be used further in usage examples, but it can be changed (example: `localhost:8080`)  
 
 ### With `PHP` and `Symfony` installed 
+```bash
+composer install && \
+	composer update
+```
+
 Request a new game ID.
 ```bash
 php bin/console play --gameServer=https://fllr.herokuapp.com --newGame
@@ -41,14 +46,19 @@ docker build -t fc .
 ```
 Run it
 ```bash
-docke run fc
+docker run fc
 ```
 
-Or pass env. variables
+Request game id
 ```bash
-docker run -e ENV GAME_SERVER=<GAME_SERVER> \
- -e GAME_ID=<GAME_ID> \
- -e PLAYER_ID=<PLAYER_ID> fc
+docker run -e NEW_GAME=true fc
+```
+
+Or pass environment variables
+```bash
+docker run -e GAME_SERVER=<GAME_SERVER> \
+           -e GAME_ID=<GAME_ID> \
+           -e PLAYER_ID=<PLAYER_ID> fc
 ```
 
 ## Client exit code is winner player id (on error it is `-1` or `255`)
