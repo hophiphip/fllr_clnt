@@ -7,6 +7,7 @@ use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
@@ -14,6 +15,9 @@ use Symfony\Contracts\HttpClient\Exception\RedirectionExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\ServerExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
+
+// TODO: Add time stat
+// TODO: Add proper CLI arguments
 
 class PlayFillerCommand extends Command {
     /**
@@ -79,9 +83,26 @@ class PlayFillerCommand extends Command {
     protected function configure(): void
     {
         $this->setHelp('Give it an API and it will do the rest...')
-            ->addArgument('gameServer', InputArgument::REQUIRED, 'Game server URL')
-            ->addArgument('gameId', InputArgument::REQUIRED, 'Game id')
-            ->addArgument('gamePlayerId', InputArgument::REQUIRED, 'In game player id');
+            ->addOption(
+                'gameServer',
+                's',
+                InputOption::VALUE_REQUIRED,
+                'Game server URL'
+            )
+
+            ->addOption(
+                'gameId',
+                'g',
+                InputOption::VALUE_REQUIRED,
+                'Game id'
+            )
+
+            ->addOption(
+                'playerId',
+                'p',
+                InputOption::VALUE_REQUIRED,
+                'In game player id'
+            );
     }
 
     /**
@@ -97,9 +118,9 @@ class PlayFillerCommand extends Command {
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Set parameters
-        $this->gameServerUrl = $input->getArgument('gameServer');
-        $this->gameId = $input->getArgument('gameId');
-        $this->gamePlayerId = $input->getArgument('gamePlayerId');
+        $this->gameServerUrl = $input->getOption('gameServer');
+        $this->gameId = $input->getOption('gameId');
+        $this->gamePlayerId = $input->getOption('playerId');
 
         // Validate parameters
         if (!($this->gamePlayerId == '1') && !($this->gamePlayerId == '2')) {
