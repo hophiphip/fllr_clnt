@@ -44,6 +44,13 @@ Run it
 docke run fc
 ```
 
+Or pass env. variables
+```bash
+docker run -e ENV GAME_SERVER=<GAME_SERVER> \
+ -e GAME_ID=<GAME_ID> \
+ -e PLAYER_ID=<PLAYER_ID> fc
+```
+
 ## Client exit code is winner player id (on error it is `-1` or `255`)
 Check it after running the client
 ```bash
