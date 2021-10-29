@@ -207,6 +207,7 @@ class PlayFillerCommand extends Command {
         }
 
         // Game solver
+        //
         { // START_OF_SCOPE
             // Player 1 & 2 stats
             $stats = [
