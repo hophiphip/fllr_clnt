@@ -8,6 +8,7 @@ use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
 use Symfony\Contracts\HttpClient\Exception\ClientExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\DecodingExceptionInterface;
 use Symfony\Contracts\HttpClient\Exception\RedirectionExceptionInterface;
@@ -16,7 +17,6 @@ use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 // TODO: Add time stat
-// TODO: Request a game id
 // TODO: Use a better solution method
 
 class PlayFillerCommand extends Command {
@@ -98,17 +98,33 @@ class PlayFillerCommand extends Command {
             ->addOption(
                 'gameId',
                 'g',
-                InputOption::VALUE_REQUIRED,
+                InputOption::VALUE_OPTIONAL,
                 'Game id'
             )
 
             ->addOption(
                 'playerId',
                 'p',
-                InputOption::VALUE_REQUIRED,
+                InputOption::VALUE_OPTIONAL,
                 'In game player id'
-            );
+            )
+
+            ->addOption(
+                'newGame',
+                'a',
+                InputOption::VALUE_NONE,
+                'Request a new game id'
+            )
+
+            ->addOption(
+            'noSubmit',
+            'x',
+            InputOption::VALUE_NONE,
+            'Make a PUT request to the API with calculated move'
+    );
     }
+
+    // TODO: Needs a proper refactoring .. but i don't care for now
 
     /**
      * @param InputInterface $input
@@ -123,9 +139,57 @@ class PlayFillerCommand extends Command {
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
         // Set parameters
+        if ($input->getOption('gameServer') == null) {
+            $output->writeln([
+                'Server url is required'
+            ]);
+
+            return  -1;
+        }
         $this->gameServerUrl = $input->getOption('gameServer');
-        $this->gameId = $input->getOption('gameId');
-        $this->gamePlayerId = $input->getOption('playerId');
+
+        // Add HTTP prefix if not provided
+        if (!str_starts_with($this->gameServerUrl, 'http')) {
+            $this->gameServerUrl = 'http://' . $this->gameServerUrl;
+        }
+
+        $this->gameId = $input->getOption('gameId') == null ? "" : $input->getOption('gameId');
+        $this->gamePlayerId = $input->getOption('playerId') == null ? "" : $input->getOption('playerId');
+
+        // Don't submit next move if `noSubmit` flag was provided
+        if ($input->getOption('noSubmit')) {
+            $this->autoSubmitColor = false;
+        }
+
+        // MODE 1: Generate game id
+        // If `new game` flag was provided then request a new game ID
+        $isNewGame = $input->getOption('newGame');
+        if ($isNewGame) {
+            $newGame = $this->requestNewGameId($this->gameServerUrl . $this->apiGameRoute);
+
+            if ($newGame['error'] != '') {
+                $output->writeln([
+                    'App finished with error: ' . $newGame['error']
+                ]);
+
+                return  -1;
+            } else {
+                $io = new SymfonyStyle($input, $output);
+                $io->success('New game id was generated: ' . $newGame['newGameId']);
+            }
+
+            return 0;
+        }
+
+        // MODE 2: Calculate a player next move
+        // Validate arguments
+        if ($this->gameId == '') {
+            $output->writeln([
+               'Game ID was not provided',
+            ]);
+
+            return -1;
+        }
 
         // Validate parameters
         if (!($this->gamePlayerId == '1') && !($this->gamePlayerId == '2')) {
@@ -134,12 +198,7 @@ class PlayFillerCommand extends Command {
                 '..you got: ' . $this->gamePlayerId,
             ]);
 
-            return Command::FAILURE;
-        }
-
-        // Add HTTP prefix if not provided
-        if (!str_starts_with($this->gameServerUrl, 'http')) {
-            $this->gameServerUrl = 'http://' . $this->gameServerUrl;
+            return -1;
         }
 
         // Welcome message
@@ -167,7 +226,7 @@ class PlayFillerCommand extends Command {
 
         // Debug log status
         $output->writeln([
-            json_encode($result)
+            'winnerId: ' . $result['winnerId'] . ", previously submitted color is: " . $result['submittedColor']
         ]);
 
         return $result['winnerId'];
@@ -210,7 +269,7 @@ class PlayFillerCommand extends Command {
                 } break;
 
                 default: {
-                    $result['error'] = "Unknown GET error";
+                    $result['error'] = "Unknown GET error. HTTP code: " . $status;
                 }
             }
 
@@ -257,6 +316,10 @@ class PlayFillerCommand extends Command {
                 6 => [],
             ];
 
+            unset($colorStats[Colors::$colorsTable[$content['players'][1]['color']]]);
+            unset($colorStats[Colors::$colorsTable[$content['players'][2]['color']]]);
+
+            // TODO: This approach is the best on server as only the server knows th chronology on players' cells-statistics
             foreach ($colorStats as $colorKey => $colorStat) {
                 $field = Field::fromArray($content['field']);
 
@@ -323,22 +386,40 @@ class PlayFillerCommand extends Command {
 
         // Get next color number
         $nextColorKey = array_key_first($colorStats);
+        $nextColorKeyStat = count($colorStats[$nextColorKey]);
         foreach ($colorStats as $colorKey => $colorStat) {
             if (count($colorStats[$nextColorKey]) < count($colorStat)) {
                 $nextColorKey = $colorKey;
+                $nextColorKeyStat = count($colorStat);
             }
         }
 
         $result['submittedColor'] = Colors::$colors[$nextColorKey];
 
+        // Handle `Hex` colors and `string` colors
+        $nextColor = "";
+        if (array_key_exists($content['field']['cells'][1]['color'], Colors::$toFancyColors)) {
+            $nextColor = Colors::$toFancyColors[$nextColorKey];
+        } else if(array_key_exists($content['field']['cells'][1]['color'], Colors::$toNormalColors)) {
+            $nextColor = Colors::$toNormalColors[$nextColorKey];
+        }
+
+        // TODO: PUT this request to a separate function
         // Submit the color for the player if necessary
         if ($this->autoSubmitColor) {
             $putResponse = $this->client->request('PUT', $apiRoute . '/' . $gameId, [
                 'body' => [
                     'playerId' => $content['currentPlayerId'],
-                    'color' => Colors::$colors[$nextColorKey],
+                    'color' => $nextColor,
+                ],
+
+                'headers' => [
+                    'Accept' => 'application/json',
                 ],
             ]);
+
+            $putContent = $putResponse->toArray();
+            $result['winnerId'] = $putContent['winnerPlayerId'];
 
             $putStatus = $putResponse->getStatusCode();
             if ($putStatus != 201) {
@@ -360,12 +441,72 @@ class PlayFillerCommand extends Command {
                     } break;
 
                     default: {
-                        $result['error'] = "Unknown PUT error";
+                        $result['error'] = "Unknown PUT error. HTTP error code: " . $putStatus;
                     }
                 }
-            }
 
-            return $result;
+                return $result;
+            }
+        } else {
+            $playerOneStats = count($stats[1]);
+            $playerTwoStats = count($stats[2]);
+            $content['currentPlayerId'] == 1 ? $playerOneStats += $nextColorKeyStat : $playerTwoStats += $nextColorKeyStat;
+
+            $cellCount = count($content['field']['cells']);
+
+            if (($playerOneStats / (float) $cellCount) > 0.5) $result['winnerId'] = 1;
+            else if (($playerTwoStats / (float) $cellCount) > 0.5) $result['winnerId'] = 2;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @throws TransportExceptionInterface
+     */
+    #[ArrayShape(['error' => "string", 'newGameId' => "string"])]
+    public function requestNewGameId(string $apiUrl, int $width = 25, int $height = 15): array {
+        $result = [
+            'error' => '',
+            'newGameId' => '',
+        ];
+
+        $response = $this->client->request('POST', $apiUrl, [
+            'body' => [
+                'width' => $width,
+                'height' => $height,
+            ],
+
+            'headers' => [
+                'Accept' => 'application/json',
+            ],
+        ]);
+
+        $status = $response->getStatusCode();
+        if ($status != 201) {
+            switch ($status) {
+                case 400: {
+                    $result['error'] = 'Incorrect field size.';
+                } break;
+
+                case 500: {
+                    $result['error'] = 'Internal server error';
+                } break;
+
+                default: {
+                    $result['error'] = 'Unknown POST error, HTTP code: ' . $status;
+                }
+            }
+        }
+
+        $content = [];
+        try {
+            $content = $response->toArray();
+        } catch (ClientExceptionInterface | ServerExceptionInterface | RedirectionExceptionInterface | DecodingExceptionInterface $e) {
+        } catch (TransportExceptionInterface $e) {
+            $result['error'] = 'It all failed miserably..';
+        } finally {
+            $result['newGameId'] = $content['id'];
         }
 
         return $result;

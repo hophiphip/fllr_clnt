@@ -34,6 +34,42 @@ final class Colors {
           'white' => 6,
     );
 
+    public static array $toNormalColors = array(
+        0 => '#ff0000',
+        1 => '#00ff00',
+        2 => '#0000ff',
+        3 => '#ffff00',
+        4 => '#ff00ff',
+        5 => '#00ffff',
+        6 => '#ffffff',
+
+        '#ff0000' => 0,
+        '#00ff00' => 1,
+        '#0000ff' => 2,
+        '#ffff00' => 3,
+        '#ff00ff' => 4,
+        '#00ffff' => 5,
+        '#ffffff' => 6,
+    );
+
+    public static array $toFancyColors = array(
+         0 => 'red'    ,
+         1 => 'green'  ,
+         2 => 'blue'   ,
+         3 => 'yellow' ,
+         4 => 'magenta',
+         5 => 'cyan'   ,
+         6 => 'white'  ,
+
+        'red'     => 0,
+        'green'   => 1,
+        'blue'    => 2,
+        'yellow'  => 3,
+        'magenta' => 4,
+        'cyan'    => 5,
+        'white'   => 6,
+    );
+
     /**
      * @var array $colors is a color-id to color table
      */
