@@ -5,7 +5,6 @@ use App\Models\Colors;
 use App\Models\Field;
 use JetBrains\PhpStorm\ArrayShape;
 use Symfony\Component\Console\Command\Command;
-use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -17,7 +16,8 @@ use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 
 // TODO: Add time stat
-// TODO: Add proper CLI arguments
+// TODO: Request a game id
+// TODO: Use a better solution method
 
 class PlayFillerCommand extends Command {
     /**
@@ -53,9 +53,14 @@ class PlayFillerCommand extends Command {
     private string $gamePlayerId;
 
     /**
-     * @var bool $autoSubmitColor does client need to auto submit color
+     * @var bool $autoSubmitColor does client need to auto submit color (by default set to `true`)
      */
     private bool $autoSubmitColor;
+
+    /**
+     * @var bool $enableStatistics if `true` prints total time for game-solver algorithm
+     */
+    private bool $enableStatistics;
 
     /**
      * @param HttpClientInterface $client
