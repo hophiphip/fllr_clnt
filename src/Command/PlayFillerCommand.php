@@ -74,13 +74,15 @@ class PlayFillerCommand extends Command {
         string $gameServerUrl = "",
         string $gameId = "",
         string $gamePlayerId = "0",
-        bool $autoSubmitColor = true)
+        bool $autoSubmitColor = true,
+        bool $enableStatistics = false)
     {
         $this->client = $client;
         $this->gameServerUrl = $gameServerUrl;
         $this->gameId = $gameId;
         $this->gamePlayerId = $gamePlayerId;
         $this->autoSubmitColor = $autoSubmitColor;
+        $this->enableStatistics = $enableStatistics;
 
         parent::__construct();
     }
@@ -121,7 +123,14 @@ class PlayFillerCommand extends Command {
             'x',
             InputOption::VALUE_NONE,
             'Make a PUT request to the API with calculated move'
-    );
+            )
+
+            ->addOption(
+                'stat',
+                't',
+                InputOption::VALUE_NONE,
+                'If set prints total time for game-solver algorithm'
+            );
     }
 
     // TODO: Needs a proper refactoring .. but i don't care for now
@@ -159,6 +168,11 @@ class PlayFillerCommand extends Command {
         // Don't submit next move if `noSubmit` flag was provided
         if ($input->getOption('noSubmit')) {
             $this->autoSubmitColor = false;
+        }
+
+        // Do we need statistics
+        if ($input->getOption('stat')) {
+            $this->enableStatistics = true;
         }
 
         // MODE 1: Generate game id
@@ -291,6 +305,7 @@ class PlayFillerCommand extends Command {
             return $result;
         }
 
+        $time_pre = microtime(true);
         // Game solver
         //
         { // START_OF_SCOPE
@@ -320,6 +335,7 @@ class PlayFillerCommand extends Command {
             unset($colorStats[Colors::$colorsTable[$content['players'][2]['color']]]);
 
             // TODO: This approach is the best on server as only the server knows th chronology on players' cells-statistics
+            //  the further we ge the slower it becomes, too bad it's too late to change it now.
             foreach ($colorStats as $colorKey => $colorStat) {
                 $field = Field::fromArray($content['field']);
 
@@ -383,6 +399,15 @@ class PlayFillerCommand extends Command {
 
 
         } // END_OF_SCOPE
+        $time_post = microtime(true);
+        $exec_time = $time_post - $time_pre;
+
+        // Show statistic if necessary
+        if ($this->enableStatistics) {
+            $output->writeln([
+                'Solution took: ' . $exec_time . ' seconds'
+            ]);
+        }
 
         // Get next color number
         $nextColorKey = array_key_first($colorStats);
@@ -394,15 +419,16 @@ class PlayFillerCommand extends Command {
             }
         }
 
-        $result['submittedColor'] = Colors::$colors[$nextColorKey];
-
         // Handle `Hex` colors and `string` colors
         $nextColor = "";
+
         if (array_key_exists($content['field']['cells'][1]['color'], Colors::$toFancyColors)) {
             $nextColor = Colors::$toFancyColors[$nextColorKey];
         } else if(array_key_exists($content['field']['cells'][1]['color'], Colors::$toNormalColors)) {
             $nextColor = Colors::$toNormalColors[$nextColorKey];
         }
+
+        $result['submittedColor'] = $nextColor;
 
         // TODO: PUT this request to a separate function
         // Submit the color for the player if necessary
